@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>La Casa Siempre Gana — Serie psicoeducativa sobre juego online</title>
+<meta name="description" content="Juegos psicoeducativos para prevenir la adicción a los casinos y apuestas online. Sin dinero real. Basados en evidencia científica.">
+<style>
+  :root{--bg:#0a0e1a;--panel:#141b30;--gold:#f5c542;--cyan:#3ee0e8;--text:#e8ecf5;--dim:#8a94ad;--red:#ff5470}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{min-height:100%}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;display:flex;justify-content:center;overflow-y:auto}
+  .wrap{width:100%;max-width:440px;padding:24px 18px;display:flex;flex-direction:column;min-height:100dvh}
+  .logo{font-size:44px;text-align:center;margin-top:18px}
+  h1{text-align:center;font-size:24px;margin:10px 0 4px;letter-spacing:.5px}
+  h1 span{color:var(--gold)}
+  .sub{text-align:center;color:var(--cyan);font-size:13.5px;font-weight:600;margin-bottom:22px}
+  .intro{background:var(--panel);border:1px solid #26304f;border-radius:14px;padding:15px;font-size:13.5px;line-height:1.55;color:#c6cde0;margin-bottom:18px}
+  .intro b{color:var(--gold)}
+  .gameT{font-size:12px;font-weight:800;color:var(--dim);letter-spacing:1.5px;margin:2px 0 8px}
+  a.game{display:block;text-decoration:none;color:var(--text);background:linear-gradient(135deg,#1c2542,#141b30);border:1.5px solid #35406b;border-radius:16px;padding:17px;margin-bottom:12px;transition:transform .08s}
+  a.game:active{transform:scale(.98)}
+  a.game.sport{background:linear-gradient(135deg,#143024,#0e2117);border-color:#2b7a4d}
+  .gicon{font-size:30px;float:left;margin-right:13px;line-height:1.1}
+  .glogo{float:left;width:52px;height:52px;border-radius:10px;margin-right:13px}
+  .gname{font-size:15.5px;font-weight:800;letter-spacing:.3px}
+  .gname small{color:var(--gold);font-weight:800;font-size:15.5px}
+  .gdesc{font-size:12.5px;color:var(--dim);margin-top:4px;line-height:1.45}
+  .gplay{display:inline-block;margin-top:9px;font-size:12.5px;font-weight:800;color:var(--cyan)}
+  .footer{margin-top:auto;padding-top:18px;font-size:11px;color:var(--dim);text-align:center;line-height:1.6}
+  /* formulario de registro */
+  label{display:block;font-size:12.5px;font-weight:700;color:var(--dim);margin:12px 0 5px;letter-spacing:.5px}
+  input,select{width:100%;background:#0d1224;border:1.5px solid #2c3554;border-radius:10px;padding:12px;font-size:15px;color:var(--text);outline:none}
+  input:focus,select:focus{border-color:var(--cyan)}
+  .btn{display:block;width:100%;border:none;border-radius:12px;padding:15px;font-size:16.5px;font-weight:700;cursor:pointer;margin-top:18px;background:linear-gradient(135deg,#f5c542,#e8963a);color:#1a1200}
+  .btn:active{transform:scale(.97)}
+  .err{display:none;color:var(--red);font-size:12.5px;font-weight:700;margin-top:10px;text-align:center}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">🔍</div>
+  <h1>LA CASA <span>SIEMPRE</span> GANA</h1>
+  <div class="sub">Serie psicoeducativa · Descubre cómo te atrapan los juegos de azar online</div>
+
+  <!-- ============ REGISTRO ============ -->
+  <div id="registro">
+    <div class="intro">
+      Antes de entrar, cuéntanos quién eres. Estos datos se usan <b>solo con fines educativos
+      y de registro</b> del proyecto de prevención.
+    </div>
+    <label for="rNombre">TU NOMBRE</label>
+    <input id="rNombre" type="text" maxlength="60" placeholder="Ej: Camila" autocomplete="off">
+    <label for="rEdad">TU EDAD</label>
+    <input id="rEdad" type="number" min="8" max="99" placeholder="Ej: 17" inputmode="numeric">
+    <label for="rMotivo">¿POR QUÉ ESTÁS ENTRANDO?</label>
+    <select id="rMotivo" onchange="document.getElementById('rDetalleBox').style.display = this.value==='Otra' ? 'block' : 'none'">
+      <option value="" disabled selected>Elige una opción…</option>
+      <option>Recreación</option>
+      <option>Aprendizaje</option>
+      <option>Curiosidad</option>
+      <option>Otra</option>
+    </select>
+    <div id="rDetalleBox" style="display:none">
+      <label for="rDetalle">CUÉNTANOS MÁS (DETALLA)</label>
+      <input id="rDetalle" type="text" maxlength="120" placeholder="¿Por qué entras?">
+    </div>
+    <div class="err" id="rErr">Completa tu nombre, edad y motivo para continuar</div>
+    <button class="btn" onclick="registrar()">CONTINUAR →</button>
+  </div>
+
+  <!-- ============ ELECCIÓN DE MÓDULO ============ -->
+  <div id="modulos" class="hidden">
+    <div class="intro">
+      Dos simuladores <b>sin dinero real</b> que usan las mismas técnicas documentadas de las
+      plataformas reales — y te las revelan mientras actúan sobre ti. Tu misión:
+      <b>descubrir todas las trampas</b> y sumar Puntos de Lucidez.
+    </div>
+    <div class="gameT">ELIGE TU JUEGO</div>
+    <a class="game" href="casino.html">
+      <span class="gicon">🎰</span>
+      <div class="gname">MÓDULO 1 · CASINO ONLINE<br><small>"LA CASA SIEMPRE GANA"</small></div>
+      <div class="gdesc">Casi-aciertos programados, celebraciones sobre pérdidas, bonos con letra chica. 8 trampas por descubrir.</div>
+      <span class="gplay">JUGAR →</span>
+    </a>
+    <a class="game sport" href="deportes.html">
+      <img class="glogo" src="jimmybet.png" alt="JimmyBet" onerror="this.outerHTML='<span class=gicon>⚽</span>'">
+      <div class="gname">MÓDULO 2 · JIMMYBET<br><small>"ARRIÉSGALO TODO"</small></div>
+      <div class="gdesc">Margen escondido en las cuotas, ilusión de control, gol del minuto 90, cash out y combinadas. 10 trampas por descubrir.</div>
+      <span class="gplay">JUGAR →</span>
+    </a>
+  </div>
+
+  <div class="footer">
+    Herramienta educativa de prevención del juego problemático · No usa ni promueve dinero real<br>
+    Basada en evidencia científica publicada · Sígueme en Instagram: <a href="https://instagram.com/jimmy_exludopata" target="_blank" style="color:var(--cyan);font-weight:700;text-decoration:none">@jimmy_exludopata</a>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   REGISTRO DE USUARIOS
+   Pega aquí la URL de tu Web App de Google Apps Script
+   (instrucciones en el archivo que te entregó Claude).
+   Mientras diga PEGA_AQUI, el formulario funciona igual
+   pero no guarda los datos en la planilla.
+   ============================================================ */
+const REGISTRO_URL = "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT";
+
+// si ya se registró en esta sesión, saltar el formulario
+if(sessionStorage.getItem('registrado')){
+  document.addEventListener('DOMContentLoaded', mostrarModulos);
+}
+function mostrarModulos(){
+  document.getElementById('registro').classList.add('hidden');
+  document.getElementById('modulos').classList.remove('hidden');
+}
+function registrar(){
+  const nombre = document.getElementById('rNombre').value.trim();
+  const edad = document.getElementById('rEdad').value.trim();
+  const motivo = document.getElementById('rMotivo').value;
+  const detalle = document.getElementById('rDetalle') ? document.getElementById('rDetalle').value.trim() : '';
+  const err = document.getElementById('rErr');
+  if(!nombre || !edad || !motivo || (motivo==='Otra' && !detalle)){
+    err.style.display='block';
+    err.textContent = (motivo==='Otra' && !detalle) ? 'Detalla tu motivo para continuar' : 'Completa tu nombre, edad y motivo para continuar';
+    return;
+  }
+  err.style.display='none';
+  // enviar a la planilla (Google Apps Script)
+  if(REGISTRO_URL && !REGISTRO_URL.includes('PEGA_AQUI')){
+    try{
+      fetch(REGISTRO_URL, {
+        method:'POST', mode:'no-cors',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({nombre, edad, motivo, detalle})
+      });
+    }catch(e){ /* si falla el envío, no bloquear el acceso */ }
+  }
+  sessionStorage.setItem('registrado','1');
+  mostrarModulos();
+}
+</script>
+</body>
+</html>

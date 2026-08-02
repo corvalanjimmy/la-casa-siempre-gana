@@ -115,6 +115,13 @@ if(sessionStorage.getItem('registrado')){
 function mostrarModulos(){
   document.getElementById('registro').classList.add('hidden');
   document.getElementById('modulos').classList.remove('hidden');
+  // conservar el origen (?src=taller, ?src=instagram) al entrar a cada módulo
+  var src = new URLSearchParams(location.search).get('src');
+  if(src){
+    document.querySelectorAll('a.game').forEach(function(a){
+      a.href = a.getAttribute('href').split('?')[0] + '?src=' + encodeURIComponent(src);
+    });
+  }
 }
 /* Envio a la planilla: se usa un formulario dentro de un iframe oculto.
    Es el metodo mas confiable porque no depende de CORS ni de fetch. */
@@ -157,7 +164,9 @@ function registrar(){
     return;
   }
   err.style.display='none';
-  enviarRegistro({nombre: nombre, edad: edad, motivo: motivo, detalle: detalle});
+  var pid = 'P' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  sessionStorage.setItem('participante', JSON.stringify({pid: pid, edad: edad, motivo: motivo}));
+  enviarRegistro({tipo: 'registro', pid: pid, nombre: nombre, edad: edad, motivo: motivo, detalle: detalle});
   sessionStorage.setItem('registrado','1');
   mostrarModulos();
 }

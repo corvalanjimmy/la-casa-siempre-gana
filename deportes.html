@@ -332,6 +332,196 @@
 </div>
 
 <script>
+const MODULO = 'jimmybet';
+/* ============================================================
+   TELEMETRÍA — capas 1 y 2 (compartida por ambos módulos)
+   Registra índices conductuales y de aprendizaje. Sin datos
+   sensibles adicionales: solo lo que la persona ya declaró.
+   ============================================================ */
+const REGISTRO_URL = "https://script.google.com/macros/s/AKfycbxdyJQywU0dJvyT1WP0yjZDt6ezK2B9LCrv-hqv8UaKuELCACKPAXdh8XPJVGnZZMTp/exec";
+
+const T = {
+  t0: Date.now(),
+  modulo: MODULO,
+  eventos: [],          // {t, tipo, monto, resultado}
+  xrayPrimeraMs: '',    // latencia hasta activar Rayos X
+  xrayMsTotal: 0, xrayDesde: null,
+  tarjetas: [],         // ms de lectura por tarjeta
+  tarjetaAbierta: null,
+  volviBuscar: 0,       // veces que volvió del informe
+  clicsRef: 0,          // clics en referencias con DOI
+  retiroPasoMax: 0,     // hasta qué paso de la fricción llegó
+  allIns: 0,
+  enviado: false
+};
+
+function participante(){
+  try{ return JSON.parse(sessionStorage.getItem('participante')) || {}; }
+  catch(e){ return {}; }
+}
+function marcarXray(activo){
+  if(activo){
+    if(T.xrayPrimeraMs === '') T.xrayPrimeraMs = Date.now() - T.t0;
+    T.xrayDesde = Date.now();
+  } else if(T.xrayDesde){
+    T.xrayMsTotal += Date.now() - T.xrayDesde;
+    T.xrayDesde = null;
+  }
+}
+function registrarEvento(tipo, monto, resultado){
+  T.eventos.push({ t: Date.now(), tipo: tipo, monto: monto, resultado: resultado });
+}
+
+/* ---------- índices derivados ---------- */
+function calcularIndices(){
+  const ev = T.eventos.filter(e => e.tipo === 'apuesta');
+  const n = ev.length;
+  const r = {};
+  r.jugadas = n;
+  r.apuestaMedia = n ? Math.round(ev.reduce((a,e)=>a+e.monto,0)/n) : 0;
+  r.apuestaPrimera = n ? ev[0].monto : '';
+  r.apuestaUltima  = n ? ev[n-1].monto : '';
+  r.escalamiento = (n>1 && ev[0].monto) ? +(ev[n-1].monto/ev[0].monto).toFixed(2) : '';
+
+  // ÍNDICE DE CHASING: subir la apuesta tras perder (DSM-5 crit. 6 / PGSI ít. 3)
+  let trasPerdida=0, subioTrasPerdida=0, trasGanancia=0, subioTrasGanancia=0;
+  for(let i=1;i<n;i++){
+    const perdio = ev[i-1].resultado !== 'win' && ev[i-1].resultado !== 'bigwin';
+    const subio  = ev[i].monto > ev[i-1].monto;
+    if(perdio){ trasPerdida++; if(subio) subioTrasPerdida++; }
+    else { trasGanancia++; if(subio) subioTrasGanancia++; }
+  }
+  r.pctSubeTrasPerdida  = trasPerdida  ? +(100*subioTrasPerdida/trasPerdida).toFixed(1) : '';
+  r.pctSubeTrasGanancia = trasGanancia ? +(100*subioTrasGanancia/trasGanancia).toFixed(1) : '';
+  r.indiceChasing = (r.pctSubeTrasPerdida !== '' && r.pctSubeTrasGanancia !== '')
+    ? +(r.pctSubeTrasPerdida - r.pctSubeTrasGanancia).toFixed(1) : '';
+
+  // EFECTO NEAR-MISS: latencia hasta la siguiente jugada (Clark et al., 2009)
+  const latNear=[], latPerd=[], latGan=[], todas=[];
+  for(let i=1;i<n;i++){
+    const lat = (ev[i].t - ev[i-1].t)/1000;
+    if(lat > 0 && lat < 300){
+      todas.push(lat);
+      const res = ev[i-1].resultado;
+      if(res === 'nearmiss') latNear.push(lat);
+      else if(res === 'win' || res === 'bigwin') latGan.push(lat);
+      else latPerd.push(lat);
+    }
+  }
+  const media = a => a.length ? +(a.reduce((x,y)=>x+y,0)/a.length).toFixed(2) : '';
+  r.latMediaSeg      = media(todas);
+  r.latTrasNearMiss  = media(latNear);
+  r.latTrasPerdida   = media(latPerd);
+  r.latTrasGanancia  = media(latGan);
+  r.efectoNearMiss   = (r.latTrasNearMiss !== '' && r.latTrasPerdida !== '')
+    ? +(r.latTrasPerdida - r.latTrasNearMiss).toFixed(2) : '';   // >0 = reapuesta más rápido tras el casi
+  return r;
+}
+
+/* ---------- envío ---------- */
+function enviarTelemetria(completo){
+  if(T.enviado) return;
+  T.enviado = true;
+  marcarXray(false);
+  const p = participante();
+  const idx = calcularIndices();
+  const est = estadoJuego();      // lo aporta cada módulo
+  const lecturas = T.tarjetas;
+  const datos = {
+    tipo: 'juego',
+    modulo: T.modulo,
+    pid: p.pid || '',
+    edad: p.edad || '',
+    motivo: p.motivo || '',
+    duracionSeg: Math.round((Date.now()-T.t0)/1000),
+    completo: completo ? 'si' : 'no',
+    // --- capa 1: conducta ---
+    jugadas: idx.jugadas,
+    apostadoTotal: est.apostadoTotal,
+    perdidaNeta: est.perdidaNeta,
+    apuestaMedia: idx.apuestaMedia,
+    apuestaPrimera: idx.apuestaPrimera,
+    apuestaUltima: idx.apuestaUltima,
+    escalamiento: idx.escalamiento,
+    indiceChasing: idx.indiceChasing,
+    pctSubeTrasPerdida: idx.pctSubeTrasPerdida,
+    pctSubeTrasGanancia: idx.pctSubeTrasGanancia,
+    latMediaSeg: idx.latMediaSeg,
+    latTrasNearMiss: idx.latTrasNearMiss,
+    latTrasPerdida: idx.latTrasPerdida,
+    latTrasGanancia: idx.latTrasGanancia,
+    efectoNearMiss: idx.efectoNearMiss,
+    allIns: T.allIns,
+    aceptoBono: est.aceptoBono,
+    intentoRetiro: T.retiroPasoMax > 0 ? 'si' : 'no',
+    retiroPasoMax: T.retiroPasoMax,
+    extra1: est.extra1, extra2: est.extra2, extra3: est.extra3,
+    // --- capa 2: aprendizaje ---
+    lucidez: est.lucidez,
+    trampasDescubiertas: est.trampasDescubiertas,
+    trampasReveladas: est.trampasReveladas,
+    trampasTotal: est.trampasTotal,
+    pctDescubiertas: est.trampasTotal ? +(100*est.trampasDescubiertas/est.trampasTotal).toFixed(1) : '',
+    usoRayosX: T.xrayPrimeraMs === '' ? 'no' : 'si',
+    xrayLatenciaSeg: T.xrayPrimeraMs === '' ? '' : Math.round(T.xrayPrimeraMs/1000),
+    xrayTiempoSeg: Math.round(T.xrayMsTotal/1000),
+    tarjetasAbiertas: lecturas.length,
+    lecturaMediaSeg: lecturas.length ? +(lecturas.reduce((a,b)=>a+b,0)/lecturas.length/1000).toFixed(1) : '',
+    lecturaMinSeg: lecturas.length ? +(Math.min.apply(null,lecturas)/1000).toFixed(1) : '',
+    volvioABuscar: T.volviBuscar,
+    clicsReferencias: T.clicsRef,
+    fuente: (new URLSearchParams(location.search).get('src') || 'directo')
+  };
+  try{
+    const cuerpo = new URLSearchParams(datos);
+    if(navigator.sendBeacon){ navigator.sendBeacon(REGISTRO_URL, cuerpo); return; }
+    throw new Error('sin beacon');
+  }catch(e){
+    try{
+      let marco = document.getElementById('telFrame');
+      if(!marco){
+        marco = document.createElement('iframe');
+        marco.id='telFrame'; marco.name='telFrame'; marco.style.display='none';
+        document.body.appendChild(marco);
+      }
+      const form = document.createElement('form');
+      form.method='POST'; form.action=REGISTRO_URL; form.target='telFrame'; form.style.display='none';
+      Object.keys(datos).forEach(function(k){
+        const i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=datos[k]; form.appendChild(i);
+      });
+      document.body.appendChild(form); form.submit();
+    }catch(e2){}
+  }
+}
+
+/* si la persona abandona sin llegar al informe, igual se registra */
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'hidden' && T.eventos.length > 0) enviarTelemetria(false);
+});
+window.addEventListener('pagehide', function(){
+  if(T.eventos.length > 0) enviarTelemetria(false);
+});
+/* clics en referencias */
+document.addEventListener('click', function(e){
+  const a = e.target.closest ? e.target.closest('.ref a') : null;
+  if(a) T.clicsRef++;
+});
+
+function estadoJuego(){
+  return {
+    apostadoTotal: S.wagered,
+    perdidaNeta: Math.max(0, S.startBalance + (S.freebetAccepted?20000:0) - S.balance),
+    aceptoBono: S.freebetAccepted ? 'si' : 'no',
+    lucidez: S.lucidez,
+    trampasDescubiertas: Object.keys(S.foundInGame).length,
+    trampasReveladas: Object.keys(S.insightsSeen).filter(k=>!S.foundInGame[k]).length,
+    trampasTotal: TOTAL_INSIGHTS,
+    extra1: S.nearMisses90,    // goles del minuto 90 sufridos
+    extra2: S.cashoutsTaken,   // cash outs aceptados
+    extra3: S.comboPlayed ? 1 : 0
+  };
+}
+
 /* ================= ESTADO ================= */
 const S = {
   balance: 20000, stake: 5000, stakeMode: 'fixed', bets: 0, wagered: 0, startBalance: 20000,
@@ -437,6 +627,7 @@ function toggleXray(){
   document.getElementById('app').classList.toggle('xray-on', xray);
   document.getElementById('xrayToggle').classList.toggle('on', xray);
   document.getElementById('xrayState').textContent = xray ? 'ON' : 'OFF';
+  marcarXray(xray);
   if(xray) toast('👁 Rayos X: mira las probabilidades bajo cada partido');
 }
 function updateHud(){
@@ -493,7 +684,7 @@ function setStake(v, el){
   S.stake = (v === 'all') ? Math.max(MIN_STAKE, S.balance) : v;
   document.querySelectorAll('.bet').forEach(b=>b.classList.remove('sel'));
   el.classList.add('sel');
-  if(v === 'all') toast('🔥 Apostarás TODO: ' + fmt(S.balance));
+  if(v === 'all'){ T.allIns++; toast('🔥 Apostarás TODO: ' + fmt(S.balance)); }
   if(S.sel) selectOdd(S.sel.matchIdx, {H:0,D:1,A:2}[S.sel.pick]);
 }
 function startGame(){ genMatches(); show('screen-lobby'); }
@@ -550,6 +741,7 @@ function placeBet(){
   }
 
   const m = MATCHES[S.sel.matchIdx];
+  registrarEvento('apuesta', S.stake, null);
   const res = decideMatch();                    // ← decidido AQUÍ
   M = { m, pick:S.sel.pick, odd:S.sel.odd, stake:S.stake, res,
         events: scriptEvents(S.sel.pick, res),
@@ -615,6 +807,8 @@ function takeCashout(){
 function finishMatch(){
   clearInterval(M.timer);
   const won = pickSatisfied(M.pick, M.h, M.a);
+  const ultEv = T.eventos[T.eventos.length-1];
+  if(ultEv && ultEv.tipo === 'apuesta') ultEv.resultado = won ? 'win' : (M.res === 'nearmiss' ? 'nearmiss' : 'lose');
   const payout = won ? Math.round(M.stake*M.odd) : 0;
   const end = document.getElementById('mEnd');
   end.style.display = 'block';
@@ -725,6 +919,7 @@ function renderWithdraw(){
   const m = document.getElementById('withdrawModal');
   if(wstep < WSTEPS.length){
     const s = WSTEPS[wstep];
+    if(wstep+1 > T.retiroPasoMax) T.retiroPasoMax = wstep+1;
     m.innerHTML = '<span class="insight-tag" style="background:var(--gold)">💸 SOLICITUD DE RETIRO</span>'
       + '<h2>'+s.h+'</h2><p>'+s.p+'</p>'
       + '<button class="btn btn-gold" onclick="wstep++;renderWithdraw()">'+s.b+'</button>'
@@ -755,9 +950,13 @@ function showInsight(key, fromDebrief){
     first && fromDebrief ? 'Revelada en el informe — descúbrela jugando para sumar puntos' :
     S.foundInGame[key] ? 'Ya habías descubierto esta trampa' : 'Revelada en el informe — descúbrela jugando para sumar puntos';
   document.getElementById('insightOverlay').classList.add('open');
+  T.tarjetaAbierta = Date.now();
   if(fromDebrief) renderTrapGrid();
 }
-function closeInsight(){ document.getElementById('insightOverlay').classList.remove('open'); }
+function closeInsight(){
+  if(T.tarjetaAbierta){ T.tarjetas.push(Date.now() - T.tarjetaAbierta); T.tarjetaAbierta = null; }
+  document.getElementById('insightOverlay').classList.remove('open');
+}
 
 /* ================= DEBRIEF ================= */
 function renderTrapGrid(){
@@ -789,6 +988,7 @@ function endGame(){
     found >= 5 ? '👀 Buen ojo. Aún quedan trampas sin descubrir: vuelve y encuéntralas.' :
     'La casa te mostró poco de su interior. Vuelve con el Modo Rayos X activado.';
   renderTrapGrid();
+  T.enviado = false; enviarTelemetria(true);
   document.getElementById('reveals').innerHTML =
     '<div class="sectionT">Lo que la casa no te dijo</div>' +
     '<div class="reveal">El resultado de <b>cada partido se decidió en el momento en que apostaste</b>. El relato minuto a minuto, los "casi", el VAR: teatro. En la vida real el azar es genuino, pero el margen de la cuota cumple el mismo rol: garantiza que, en promedio, pierdas.</div>' +
@@ -800,6 +1000,7 @@ function endGame(){
   show('screen-debrief');
 }
 function backFromDebrief(){
+  T.volviBuscar++;
   if(S.balance < 500){
     S.balance += 10000;
     updateHud();
